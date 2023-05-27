@@ -146,5 +146,6 @@ void do_iret (struct intr_frame *tf);
 
 void thread_sleep(int64_t ticks); /* alarm clock 추가 */
 void wakeup(int64_t ticks);
+int64_t return_min_tick();
 
 #endif /* threads/thread.h */

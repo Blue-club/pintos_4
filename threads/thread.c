@@ -47,6 +47,8 @@ static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
 
+static int64_t next_tick_to_awake = INT64_MAX;
+
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
@@ -595,43 +597,69 @@ allocate_tid (void) {
 /* alarm clock 추가 */
 void
 thread_sleep(int64_t ticks) {
-	/* if the current thread is not idle thread,
-	change the state of the caller thread to BLOCKED,
-	store the local tick to wake up,
-	update the global tick if necessary,
-	and call schedule() */
-  /* When you manipulate thread list, disable interrupt! */
   enum intr_level old_level;
   old_level = intr_disable ();
   struct thread *curr = thread_current();
-  if(curr != idle_thread) { // 현재 스레드가 idle 스레드가 아닐 경우
-	curr->wakeup_tick = ticks; // 현재 스레드의 깨어날 ticks를 지정
-	list_remove(&curr->elem);
-	list_push_back(&sleep_list, &curr->elem); // sleep할 스레드(curr)를 sleep_list에 삽입
-	// update the global tick if necessary
-	do_schedule (THREAD_BLOCKED);
-	intr_set_level (old_level); // 다음 작업을 진행할 스레드를 불러오기 위해 schedule()을 호출
+  if(curr != idle_thread) { 
+	curr->wakeup_tick = ticks; 
+	curr->status = THREAD_BLOCKED;
+	
+	list_push_back(&sleep_list, &curr->elem);
+	save_min_tick();
+	schedule ();
   }
+  intr_set_level (old_level);
 }
 
-void wakeup(int64_t ticks) {
+void
+wakeup(int64_t mtick) {
 	if (list_empty(&sleep_list)) {
 		return;
 	}
+	
+	enum intr_level old_level = intr_disable ();
 	struct list_elem * curr_elem = list_front(&sleep_list);
-	while (curr_elem != list_tail(&sleep_list)) {
-		struct thread * curr_thread = list_entry (curr_elem, struct thread, elem);
-		if (curr_thread->wakeup_tick <= ticks) {
+	struct thread * curr_thread;
+	while (true) {
+		curr_thread = list_entry (curr_elem, struct thread, elem);
+		ASSERT(curr_thread->status == THREAD_BLOCKED);
+		if (curr_thread->wakeup_tick <= mtick) {
 			curr_thread->wakeup_tick = NULL;
-			curr_thread->status = THREAD_READY;
-			list_remove(curr_elem);
-			list_push_back(&ready_list, curr_elem);
-			if (list_empty(&sleep_list)) {
-				return;
-			}
-			curr_elem = list_front(&sleep_list);
-		}
-		else
+			curr_elem = list_remove(&curr_thread->elem);
+			thread_unblock(curr_thread);
+		}else{
 			curr_elem = list_next(curr_elem);
+		}
+		if (curr_elem == list_end(&sleep_list))
+			break;
+		
 	}
+
+	save_min_tick();
+
+	intr_set_level (old_level);
+}
+
+void
+save_min_tick() {
+	if (list_empty(&sleep_list)) {
+		next_tick_to_awake = INT64_MAX;
+		return;
+	}
+	struct list_elem * curr_elem = list_front(&sleep_list);
+	struct thread * curr_thread;
+	while (true) {
+		curr_thread = list_entry (curr_elem, struct thread, elem);
+		ASSERT(curr_thread->status == THREAD_BLOCKED);
+		if (curr_thread->wakeup_tick < next_tick_to_awake)
+			next_tick_to_awake = curr_thread->wakeup_tick;
+		if (curr_elem == list_back(&sleep_list))
+			break;
+		curr_elem = list_next(curr_elem);
+	}
+}
+
+int64_t
+return_min_tick() {
+	return next_tick_to_awake;
 }

@@ -102,9 +102,9 @@ timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
-		/* alarm clock 추가 */
-		if(timer_elapsed (start) < ticks)
-			thread_sleep(start + ticks);
+	/* alarm clock 추가 */
+	if(timer_elapsed (start) < ticks)
+		thread_sleep(start + ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -134,21 +134,12 @@ timer_print_stats (void) {
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
-	ticks++; // 야가 글로벌 틱스다이
+	ticks++; 
 	thread_tick ();
-	/* code to add: 
-	check sleep list and the global tick.
-	find any threads to wake up,
-	move them to the ready list if necessary.
-	update the global tick.
-	*/
-	// sleep list와 global tick을 어떻게 체크하고 캐워야할 스레드를 어떻게 뽑아낼 것인가?
-	// 방법 1. sleep list에 있는 스레드를 탐색하기 위해 cur_idx 변수를 선언 및 0을 초기화
-	// while문으로 sleep list를 탐색
-	// 배열방식으로 접근을 했기때문에 리스트는 인덱스로 값을 찾을 수가 없다
-	// 그래서 어떤 방법을 이용해서 로직을 짜야할까?
-	wakeup(ticks);
-	
+	int64_t next_tick_to_awake = return_min_tick();
+	if (ticks >= next_tick_to_awake) {
+		wakeup(ticks);
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
