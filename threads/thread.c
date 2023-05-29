@@ -114,7 +114,7 @@ thread_init (void) {
 	list_init (&ready_list);
 	list_init (&destruction_req);
 	list_init (&sleep_list); /* alarm clock 추가 */
-
+	
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
 	init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -212,6 +212,13 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+	/* compare the priorities of the currently running thread and the newly inserted one.
+	Yield the CPU if the newly arriving thread has higher priority*/
+	struct thread * curr_thread = thread_current();
+	if (t->priority > curr_thread->priority) {
+		thread_yield();
+	}
+
 	return tid;
 }
 
@@ -239,14 +246,14 @@ thread_block (void) {
    update other data. */
 void
 thread_unblock (struct thread *t) {
-	enum intr_level old_level;
-
 	ASSERT (is_thread (t));
 
-	old_level = intr_disable ();
+	enum intr_level old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	/* When the thread is unblocked, it is inserted to ready_list in the priority order. */
 	t->status = THREAD_READY;
+	list_insert_ordered(&ready_list, &t->elem, my_list_less_func, &t->priority);
+
 	intr_set_level (old_level);
 }
 
@@ -308,7 +315,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered (&ready_list, &curr->elem, my_list_less_func, &curr->priority);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -317,6 +324,7 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+	list_sort(&ready_list, my_list_less_func, &thread_current()->priority);
 }
 
 /* Returns the current thread's priority. */
@@ -623,6 +631,7 @@ wakeup(int64_t mtick) {
 	while (true) {
 		curr_thread = list_entry (curr_elem, struct thread, elem);
 		ASSERT(curr_thread->status == THREAD_BLOCKED);
+		
 		if (curr_thread->wakeup_tick <= mtick) {
 			curr_thread->wakeup_tick = NULL;
 			curr_elem = list_remove(&curr_thread->elem);
@@ -632,11 +641,9 @@ wakeup(int64_t mtick) {
 		}
 		if (curr_elem == list_end(&sleep_list))
 			break;
-		
 	}
 
 	save_min_tick();
-
 	intr_set_level (old_level);
 }
 
@@ -662,4 +669,10 @@ save_min_tick() {
 int64_t
 return_min_tick() {
 	return next_tick_to_awake;
+}
+
+bool my_list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux) {
+	struct thread * thread_a = list_entry (a, struct thread, elem);
+	struct thread * thread_b = list_entry (b, struct thread, elem);
+	return thread_a->priority > thread_b->priority;
 }

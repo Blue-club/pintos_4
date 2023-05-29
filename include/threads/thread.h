@@ -147,5 +147,6 @@ void do_iret (struct intr_frame *tf);
 void thread_sleep(int64_t ticks); /* alarm clock 추가 */
 void wakeup(int64_t ticks);
 int64_t return_min_tick();
+bool my_list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 #endif /* threads/thread.h */
