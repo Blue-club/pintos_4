@@ -212,12 +212,7 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
-	/* compare the priorities of the currently running thread and the newly inserted one.
-	Yield the CPU if the newly arriving thread has higher priority*/
-	struct thread * curr_thread = thread_current();
-	if (t->priority > curr_thread->priority) {
-		thread_yield();
-	}
+	test_max_priority();
 
 	return tid;
 }
@@ -240,7 +235,7 @@ thread_block (void) {
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
 
-   This function does not preempt the running thread.  This can
+   This function does not psemareempt the running thread.  This can
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
    update other data. */
@@ -252,7 +247,7 @@ thread_unblock (struct thread *t) {
 	ASSERT (t->status == THREAD_BLOCKED);
 	/* When the thread is unblocked, it is inserted to ready_list in the priority order. */
 	t->status = THREAD_READY;
-	list_insert_ordered(&ready_list, &t->elem, my_list_less_func, &t->priority);
+	list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
 
 	intr_set_level (old_level);
 }
@@ -315,7 +310,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_insert_ordered (&ready_list, &curr->elem, my_list_less_func, &curr->priority);
+		list_insert_ordered (&ready_list, &curr->elem, cmp_priority, NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -324,7 +319,7 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
-	list_sort(&ready_list, my_list_less_func, &thread_current()->priority);
+	test_max_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -631,7 +626,7 @@ wakeup(int64_t mtick) {
 	while (true) {
 		curr_thread = list_entry (curr_elem, struct thread, elem);
 		ASSERT(curr_thread->status == THREAD_BLOCKED);
-		
+
 		if (curr_thread->wakeup_tick <= mtick) {
 			curr_thread->wakeup_tick = NULL;
 			curr_elem = list_remove(&curr_thread->elem);
@@ -671,8 +666,20 @@ return_min_tick() {
 	return next_tick_to_awake;
 }
 
-bool my_list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux) {
+bool
+cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux) {
 	struct thread * thread_a = list_entry (a, struct thread, elem);
 	struct thread * thread_b = list_entry (b, struct thread, elem);
 	return thread_a->priority > thread_b->priority;
+}
+
+/* compare the priorities of the currently running thread and the newly inserted one.
+	Yield the CPU if the newly arriving thread has higher priority*/
+void
+test_max_priority (void) {
+	if (list_empty(&ready_list))
+		return;
+	if (cmp_priority(list_front(&ready_list), &thread_current()->elem, NULL)) {
+		thread_yield();
+	}
 }
