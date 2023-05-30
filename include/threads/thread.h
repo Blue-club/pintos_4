@@ -148,5 +148,6 @@ void thread_sleep(int64_t ticks); /* alarm clock 추가 */
 void wakeup(int64_t ticks);
 int64_t return_min_tick();
 bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+void test_max_priority (void);
 
 #endif /* threads/thread.h */

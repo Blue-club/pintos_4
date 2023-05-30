@@ -607,7 +607,7 @@ thread_sleep(int64_t ticks) {
 	curr->wakeup_tick = ticks; 
 	curr->status = THREAD_BLOCKED;
 	
-	list_push_back(&sleep_list, &curr->elem);
+	list_insert_ordered(&sleep_list, &curr->elem, cmp_priority, NULL);
 	save_min_tick();
 	schedule ();
   }
