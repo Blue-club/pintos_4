@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -92,6 +93,11 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 	int64_t wakeup_tick;				/* alarm clock 추가 */
+	
+	int init_priority; // thread의 priority는 donation에 의해 매번 바뀔 수 있음. 그러니 맨 처음에 할당받은 priority를 기억해둬야!
+	struct lock *wait_on_lock; // 해당 스레드가 대기하고 있는 lock 자료구조 주소 저장: thread가 원하는 lock을 이미 다른 thread가 점유하고 있으면 lock의 주소를 저장한다.
+	struct list donations; // multiple donation 고려하기 위해 사용: A thread가 B thread에 의해 priority가 변경됐다면 A thread의 list donations에 B 스레드를 기억해놓는다.
+	struct list_elem donation_elem; // multiple donation 고려하기 위해 사용: B thread는 A thread의 기부자 목록에 자신 이름 새겨놓아야! 이를 donation_elem!
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
@@ -142,9 +148,12 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-void do_iret (struct intr_frame *tf);
+void do_iret (struct intr_frame *);
 
-void thread_sleep(int64_t ticks); /* alarm clock 추가 */
-void wakeup(int64_t ticks);
+void thread_sleep(int64_t); /* alarm clock 추가 */
+void wakeup(int64_t);
+int64_t return_min_tick();
+bool cmp_priority (const struct list_elem *, const struct list_elem *, void *);
+void test_max_priority (void);
 
 #endif /* threads/thread.h */

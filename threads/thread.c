@@ -47,6 +47,8 @@ static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
 
+static int64_t next_tick_to_awake = INT64_MAX;
+
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
@@ -112,7 +114,7 @@ thread_init (void) {
 	list_init (&ready_list);
 	list_init (&destruction_req);
 	list_init (&sleep_list); /* alarm clock 추가 */
-
+	
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
 	init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -210,6 +212,8 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+	test_max_priority();
+
 	return tid;
 }
 
@@ -231,20 +235,20 @@ thread_block (void) {
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
 
-   This function does not preempt the running thread.  This can
+   This function does not psemareempt the running thread.  This can
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
    update other data. */
 void
 thread_unblock (struct thread *t) {
-	enum intr_level old_level;
-
 	ASSERT (is_thread (t));
 
-	old_level = intr_disable ();
+	enum intr_level old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	/* When the thread is unblocked, it is inserted to ready_list in the priority order. */
 	t->status = THREAD_READY;
+	list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
+
 	intr_set_level (old_level);
 }
 
@@ -306,7 +310,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered (&ready_list, &curr->elem, cmp_priority, NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -314,7 +318,9 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	thread_current ()->init_priority = new_priority;
+	refresh_priority();
+	test_max_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -412,6 +418,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	t->init_priority = priority;
+	t->wait_on_lock = NULL;
+	list_init(&t->donations);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -595,43 +605,87 @@ allocate_tid (void) {
 /* alarm clock 추가 */
 void
 thread_sleep(int64_t ticks) {
-	/* if the current thread is not idle thread,
-	change the state of the caller thread to BLOCKED,
-	store the local tick to wake up,
-	update the global tick if necessary,
-	and call schedule() */
-  /* When you manipulate thread list, disable interrupt! */
   enum intr_level old_level;
   old_level = intr_disable ();
   struct thread *curr = thread_current();
-  if(curr != idle_thread) { // 현재 스레드가 idle 스레드가 아닐 경우
-	curr->wakeup_tick = ticks; // 현재 스레드의 깨어날 ticks를 지정
-	list_remove(&curr->elem);
-	list_push_back(&sleep_list, &curr->elem); // sleep할 스레드(curr)를 sleep_list에 삽입
-	// update the global tick if necessary
-	do_schedule (THREAD_BLOCKED);
-	intr_set_level (old_level); // 다음 작업을 진행할 스레드를 불러오기 위해 schedule()을 호출
+  if(curr != idle_thread) { 
+	curr->wakeup_tick = ticks; 
+	curr->status = THREAD_BLOCKED;
+	
+	list_insert_ordered(&sleep_list, &curr->elem, cmp_priority, NULL);
+	save_min_tick();
+	schedule ();
   }
+  intr_set_level (old_level);
 }
 
-void wakeup(int64_t ticks) {
+void
+wakeup(int64_t mtick) {
 	if (list_empty(&sleep_list)) {
 		return;
 	}
+	
+	enum intr_level old_level = intr_disable ();
 	struct list_elem * curr_elem = list_front(&sleep_list);
-	while (curr_elem != list_tail(&sleep_list)) {
-		struct thread * curr_thread = list_entry (curr_elem, struct thread, elem);
-		if (curr_thread->wakeup_tick <= ticks) {
+	struct thread * curr_thread;
+	while (true) {
+		curr_thread = list_entry (curr_elem, struct thread, elem);
+		ASSERT(curr_thread->status == THREAD_BLOCKED);
+
+		if (curr_thread->wakeup_tick <= mtick) {
 			curr_thread->wakeup_tick = NULL;
-			curr_thread->status = THREAD_READY;
-			list_remove(curr_elem);
-			list_push_back(&ready_list, curr_elem);
-			if (list_empty(&sleep_list)) {
-				return;
-			}
-			curr_elem = list_front(&sleep_list);
-		}
-		else
+			curr_elem = list_remove(&curr_thread->elem);
+			thread_unblock(curr_thread);
+		}else{
 			curr_elem = list_next(curr_elem);
+		}
+		if (curr_elem == list_end(&sleep_list))
+			break;
+	}
+
+	save_min_tick();
+	intr_set_level (old_level);
+}
+
+void
+save_min_tick() {
+	if (list_empty(&sleep_list)) {
+		next_tick_to_awake = INT64_MAX;
+		return;
+	}
+	struct list_elem * curr_elem = list_front(&sleep_list);
+	struct thread * curr_thread;
+	while (true) {
+		curr_thread = list_entry (curr_elem, struct thread, elem);
+		ASSERT(curr_thread->status == THREAD_BLOCKED);
+		if (curr_thread->wakeup_tick < next_tick_to_awake)
+			next_tick_to_awake = curr_thread->wakeup_tick;
+		if (curr_elem == list_back(&sleep_list))
+			break;
+		curr_elem = list_next(curr_elem);
 	}
 }
+
+int64_t
+return_min_tick() {
+	return next_tick_to_awake;
+}
+
+bool
+cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux) {
+	struct thread * thread_a = list_entry (a, struct thread, elem);
+	struct thread * thread_b = list_entry (b, struct thread, elem);
+	return thread_a->priority > thread_b->priority;
+}
+
+/* compare the priorities of the currently running thread and the newly inserted one.
+	Yield the CPU if the newly arriving thread has higher priority*/
+void
+test_max_priority (void) {
+	if (list_empty(&ready_list))
+		return;
+	if (cmp_priority(list_front(&ready_list), &thread_current()->elem, NULL)) {
+		thread_yield();
+	}
+}
+
