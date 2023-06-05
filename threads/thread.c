@@ -684,7 +684,7 @@ void
 test_max_priority (void) {
 	if (list_empty(&ready_list))
 		return;
-	if (cmp_priority(list_front(&ready_list), &thread_current()->elem, NULL)) {
+	if (!intr_context() && cmp_priority(list_front(&ready_list), &thread_current()->elem, NULL)) {
 		thread_yield();
 	}
 }

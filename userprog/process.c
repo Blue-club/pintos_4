@@ -158,6 +158,41 @@ error:
 	thread_exit ();
 }
 
+/* argument parsing for project 2*/
+void
+argument_stack(char **argv, int argc, struct intr_frame *if_) {
+	/* argument stack downwards using rsp stack pointer */
+	for (int i = argc-1; i >= 0; i--) {
+		int N = strlen(argv[i]) + 1;
+		if_->rsp -= N;
+		memcpy(if_->rsp, argv[i], N);
+		argv[i] = (char *)if_->rsp;
+	}
+	
+	/* word-alignment*/
+	if (if_->rsp%8) {
+		int padding = if_->rsp%8;
+		if_->rsp -= padding;
+		memset(if_->rsp, 0, padding);
+	}
+
+	/* for null sentinel */
+	if_->rsp -= 8;
+	memset(if_->rsp, 0, sizeof(char **));
+
+	for (int i = argc-1; i >= 0; i--) {
+		if_->rsp -= 8;
+		memcpy(if_->rsp, &argv[i], sizeof(char **));
+	}
+
+	/* fake return address */
+	if_->rsp -= 8;
+	memset(if_->rsp, 0, sizeof(void *));
+
+	if_->R.rdi = argc;
+	if_->R.rsi = if_->rsp + 8;
+}
+
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
 int
@@ -176,9 +211,23 @@ process_exec (void *f_name) {
 	/* We first kill the current context */
 	process_cleanup ();
 
+	/* todo: implementation argument passing */
+	int argc = 0;
+	char *argv[64];
+	char *ret_ptr, *next_ptr;
+
+	ret_ptr = strtok_r(file_name, " ", &next_ptr);
+	while(ret_ptr) {
+		argv[argc++] = ret_ptr;
+		ret_ptr = strtok_r(NULL, " ", &next_ptr);
+	}
+
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
+	argument_stack(argv, argc, &_if);
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
@@ -204,6 +253,7 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	while (true) {}
 	return -1;
 }
 
