@@ -39,8 +39,35 @@ syscall_init (void) {
 
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
+syscall_handler (struct intr_frame *f) {
 	// TODO: Your implementation goes here.
+
 	printf ("system call!\n");
 	thread_exit ();
 }
+
+void
+check_address(void *addr) {
+	// TODO: If you encounter an invalid user pointer afterward, you must still be sure to release the lock or free the page of memory.
+	struct thread *curr_thread = thread_current();
+
+	if (is_kernel_vaddr(addr) || addr == NULL || pml4_get_page(curr_thread->pml4, addr) == NULL) {
+		exit(-1);
+	}
+}
+
+// void halt (void) {
+
+// }
+
+// void exit (int status) {
+
+// }
+
+// bool create (const char *file, unsigned initial_size) {
+
+// }
+
+// bool remove (const char *file) {
+
+// }
