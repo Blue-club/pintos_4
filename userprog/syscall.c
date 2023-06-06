@@ -52,6 +52,7 @@ check_address(void *addr) {
 	struct thread *curr_thread = thread_current();
 
 	if (is_kernel_vaddr(addr) || addr == NULL || pml4_get_page(curr_thread->pml4, addr) == NULL) {
+		pml4_destroy(curr_thread->pml4);
 		exit(-1);
 	}
 }
