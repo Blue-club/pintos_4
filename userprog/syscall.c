@@ -41,6 +41,12 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f) {
 	// TODO: Your implementation goes here.
+	check_address (f->rsp);
+	int syscall_number = f->R.rax;
+
+	switch (syscall_number) {
+
+	}
 
 	printf ("system call!\n");
 	thread_exit ();
@@ -49,21 +55,25 @@ syscall_handler (struct intr_frame *f) {
 void
 check_address(void *addr) {
 	// TODO: If you encounter an invalid user pointer afterward, you must still be sure to release the lock or free the page of memory.
-	struct thread *curr_thread = thread_current();
+	struct thread *t = thread_current();
 
-	if (is_kernel_vaddr(addr) || addr == NULL || pml4_get_page(curr_thread->pml4, addr) == NULL) {
-		pml4_destroy(curr_thread->pml4);
+	if (is_kernel_vaddr(addr) || addr == NULL || pml4_get_page(t->pml4, addr) == NULL) {
+		pml4_destroy(t->pml4);
 		exit(-1);
 	}
 }
 
-// void halt (void) {
+void
+halt (void) {
+	power_off();
+}
 
-// }
-
-// void exit (int status) {
-
-// }
+void
+exit (int status) {
+	struct thread *t = thread_current();
+	printf("%s: exit %d\n", t->name, status);
+	thread_exit();
+}
 
 // bool create (const char *file, unsigned initial_size) {
 
