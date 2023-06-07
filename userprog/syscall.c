@@ -45,7 +45,48 @@ syscall_handler (struct intr_frame *f) {
 	int syscall_number = f->R.rax;
 
 	switch (syscall_number) {
-
+		case SYS_HALT:
+			halt();
+			break;
+		case SYS_EXIT:
+			exit(f->R.rdi);
+			break;
+		case SYS_FORK:
+			fork(f->R.rdi);
+			break;
+		case SYS_EXEC:
+			exec(f->R.rdi);
+			break;
+		case SYS_WAIT:
+			wait(f->R.rdi);
+			break;
+		case SYS_CREATE:
+			create(f->R.rdi, f->R.rsi);
+			break;
+		case SYS_REMOVE:
+			remove(f->R.rdi);
+			break;	
+		case SYS_OPEN:
+			open(f->R.rdi);		
+			break;
+		case SYS_FILESIZE:
+			filesize(f->R.rdi);
+			break;
+		case SYS_READ:
+			read(f->R.rdi, f->R.rsi, f->R.rdx);
+			break;
+		case SYS_WRITE:
+			write(f->R.rdi, f->R.rsi, f->R.rdx);
+			break;
+		case SYS_SEEK:
+			seek(f->R.rdi, f->R.rsi);
+			break;	
+		case SYS_TELL:
+			tell(f->R.rdi);
+			break;
+		case SYS_CLOSE:
+			close(f->R.rdi);
+			break;
 	}
 
 	printf ("system call!\n");
@@ -75,10 +116,19 @@ exit (int status) {
 	thread_exit();
 }
 
-// bool create (const char *file, unsigned initial_size) {
+pid_t fork (const char *thread_name) {
+	
+}
 
-// }
+int
+open (const char *file) {
+	return filesys_open (file);
+}
 
-// bool remove (const char *file) {
+bool create (const char *file, unsigned initial_size) {
+	return filesys_create (file, initial_size);
+}
 
-// }
+bool remove (const char *file) {
+	return filesys_remove (file);
+}
