@@ -99,7 +99,6 @@ check_address(void *addr) {
 	struct thread *t = thread_current();
 
 	if (is_kernel_vaddr(addr) || addr == NULL || pml4_get_page(t->pml4, addr) == NULL) {
-		pml4_destroy(t->pml4);
 		exit(-1);
 	}
 }
@@ -116,19 +115,65 @@ exit (int status) {
 	thread_exit();
 }
 
-pid_t fork (const char *thread_name) {
+pid_t
+fork (const char *thread_name) {
+
+}
+
+int
+exec (const char *cmd_line) {
+
+}
+
+int
+wait (pid_t pid) {
 	
+}
+
+bool
+create (const char *file, unsigned initial_size) {
+	check_address (file);
+	return filesys_create (file, initial_size);
+}
+
+bool
+remove (const char *file) {
+	check_address (file);
+	return filesys_remove (file);
 }
 
 int
 open (const char *file) {
+	check_address (file);
 	return filesys_open (file);
 }
 
-bool create (const char *file, unsigned initial_size) {
-	return filesys_create (file, initial_size);
+int
+filesize (int fd) {
+
 }
 
-bool remove (const char *file) {
-	return filesys_remove (file);
+int
+read (int fd, void *buffer, unsigned size) {
+
+}
+
+int
+write (int fd, const void *buffer, unsigned size) {
+
+}
+
+void
+seek (int fd, unsigned position) {
+
+}
+
+unsigned
+tell (int fd) {
+
+}
+
+void
+close (int fd) {
+
 }
