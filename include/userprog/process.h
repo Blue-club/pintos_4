@@ -9,14 +9,6 @@ int process_exec (void *f_name);
 int process_wait (tid_t);
 void process_exit (void);
 void process_activate (struct thread *next);
-
-
-//-------------project2 수정------------//
-// parse: 프로그램 이름과 인자가 담긴 배열
-// count: 인자의 개수
-// rsp: 스택 포인터를 가리키는 주소 값
-void argument_stack(char **parse, int count, void **rsp);
-//-------------------------------------//
-
+void argument_stack(char **argv, int argc, struct intr_frame *if_);
 
 #endif /* userprog/process.h */

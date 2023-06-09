@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include "threads/interrupt.h"
 #include "threads/synch.h"
+#define USERPROG
+#define FILESYS
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -92,17 +94,23 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-	int64_t wakeup_tick;				/* alarm clock 추가 */
 	
-	int init_priority; // thread의 priority는 donation에 의해 매번 바뀔 수 있음. 그러니 맨 처음에 할당받은 priority를 기억해둬야!
-	struct lock *wait_on_lock; // 해당 스레드가 대기하고 있는 lock 자료구조 주소 저장: thread가 원하는 lock을 이미 다른 thread가 점유하고 있으면 lock의 주소를 저장한다.
-	struct list donations; // multiple donation 고려하기 위해 사용: A thread가 B thread에 의해 priority가 변경됐다면 A thread의 list donations에 B 스레드를 기억해놓는다.
-	struct list_elem donation_elem; // multiple donation 고려하기 위해 사용: B thread는 A thread의 기부자 목록에 자신 이름 새겨놓아야! 이를 donation_elem!
+	/* Project 1. */
+	int64_t wakeup_tick;
+	int init_priority;
+	struct lock *wait_on_lock;
+	struct list donations;
+	struct list_elem donation_elem;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
 #ifdef USERPROG
+	/* Project 2. */
+	struct thread *parent;
+	struct list sibling_list;
+	struct list_elem children_elem;
+	
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
 #endif

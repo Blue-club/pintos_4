@@ -96,26 +96,15 @@ timer_elapsed (int64_t then) {
 // 	while (timer_elapsed (start) < ticks)
 // 		thread_yield ();
 // }
-//수정
+
 void
 timer_sleep (int64_t ticks) {
-	//프로그램 시작후 지난 시간 
 	int64_t start = timer_ticks ();
 
-	//현재 인터럽트 상태가 인터럽트 허용이 아니면 종료
 	ASSERT (intr_get_level () == INTR_ON);
-
-		/* alarm clock 추가 */
-
-	if(timer_elapsed (start) < ticks) // 얘 없어도 돌아감
-
-		// 스레드를 쉬게 하는게 목적
-		// ticks가 10 이고 start한지 5초가 지난 스레드가있으면
-		// 일하고있는 스레드를 ticks(10초)만큼 쉬게 하는게 목적이니
-		// 일한지 5초가 지난 애들 10초 쉬게 하려면 
-		// 15초에 깨우면 된단 뜻
-		// 그래서 start+ticks를 하는것
-		thread_sleep(start + ticks); 
+	/* alarm clock 추가 */
+	if(timer_elapsed (start) < ticks)
+		thread_sleep(start + ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -142,20 +131,15 @@ timer_print_stats (void) {
 	printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-//수정
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
-	ticks++; // 야가 글로벌 틱스다이
+	ticks++; 
 	thread_tick ();
 	int64_t next_tick_to_awake = return_min_tick();
-	if (ticks >= next_tick_to_awake)
-	{
+	if (ticks >= next_tick_to_awake) {
 		wakeup(ticks);
 	}
-	
-
-	
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

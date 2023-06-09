@@ -113,7 +113,9 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
-	list_init (&sleep_list); /* alarm clock 추가 */
+
+	/* Project 1 */
+	list_init (&sleep_list);
 	
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -212,6 +214,7 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+	/* Project 1 */
 	test_max_priority();
 
 	return tid;
@@ -247,7 +250,7 @@ thread_unblock (struct thread *t) {
 	ASSERT (t->status == THREAD_BLOCKED);
 	/* When the thread is unblocked, it is inserted to ready_list in the priority order. */
 	t->status = THREAD_READY;
-	list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
+	list_insert_ordered (&ready_list, &t->elem, cmp_priority, NULL);
 
 	intr_set_level (old_level);
 }
@@ -419,9 +422,14 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 
+	/* Project 1. */
 	t->init_priority = priority;
 	t->wait_on_lock = NULL;
-	list_init(&t->donations);
+	list_init (&t->donations);
+
+	/* Project 2. */
+	t->parent = NULL;
+	list_init (&t->sibling_list);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -684,8 +692,7 @@ void
 test_max_priority (void) {
 	if (list_empty(&ready_list))
 		return;
-	if (cmp_priority(list_front(&ready_list), &thread_current()->elem, NULL)) {
+	if (!intr_context() && cmp_priority(list_front(&ready_list), &thread_current()->elem, NULL)) {
 		thread_yield();
 	}
 }
-

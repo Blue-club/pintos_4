@@ -7,6 +7,8 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "threads/palloc.h"
+
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -120,9 +122,26 @@ fork (const char *thread_name) {
 
 }
 
-int
-exec (const char *cmd_line) {
+int exec(const char *cmd_line)
+{
+	check_address(cmd_line);
 
+	// process.c 파일의 process_create_initd 함수와 유사하다.
+	// 단, 스레드를 새로 생성하는 건 fork에서 수행하므로
+	// 이 함수에서는 새 스레드를 생성하지 않고 process_exec을 호출한다.
+
+	// process_exec 함수 안에서 filename을 변경해야 하므로
+	// 커널 메모리 공간에 cmd_line의 복사본을 만든다.
+	// (현재는 const char* 형식이기 때문에 수정할 수 없다.)
+	char *cmd_line_copy;
+	cmd_line_copy = palloc_get_page(PAL_ZERO);
+	if (cmd_line_copy == NULL)
+		exit(-1);							  // 메모리 할당 실패 시 status -1로 종료한다.
+	strlcpy(cmd_line_copy, cmd_line, PGSIZE); // cmd_line을 복사한다.
+
+	// 스레드의 이름을 변경하지 않고 바로 실행한다.
+	if (process_exec(cmd_line_copy) == -1)
+		exit(-1); // 실패 시 status -1로 종료한다.
 }
 
 int
