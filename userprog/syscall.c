@@ -7,6 +7,7 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "threads/palloc.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -98,10 +99,10 @@ syscall_handler (struct intr_frame *f) {
 void
 check_address(void *addr) {
 	// TODO: If you encounter an invalid user pointer afterward, you must still be sure to release the lock or free the page of memory.
-	struct thread *t = thread_current();
+	struct thread *t = thread_current ();
 
 	if (is_kernel_vaddr (addr) || addr == NULL || pml4_get_page (t->pml4, addr) == NULL) {
-		exit(-1);
+		exit (-1);
 	}
 }
 
@@ -125,7 +126,17 @@ fork (const char *thread_name) {
 
 int
 exec (const char *cmd_line) {
-
+	check_address (cmd_line);
+	char *file_name = (char *)palloc_get_page (PAL_ASSERT);
+	if (file_name == NULL)
+		exit (-1);
+	
+	memcpy (file_name, cmd_line, strlen (cmd_line)+1);
+	// check_address (file_name);
+	int result = process_exec (file_name);
+	if (result == -1) {
+		exit (-1);
+	}
 }
 
 int
