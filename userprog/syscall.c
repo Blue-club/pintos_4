@@ -89,8 +89,8 @@ syscall_handler (struct intr_frame *f) {
 			break;
 	}
 
-	printf ("system call!\n");
-	thread_exit ();
+	// printf ("system call!\n");
+	// thread_exit ();
 }
 
 void
@@ -111,7 +111,7 @@ halt (void) {
 void
 exit (int status) {
 	struct thread *t = thread_current();
-	printf("%s: exit %d\n", t->name, status);
+	printf("%s: exit(%d)\n", t->name, status);
 	thread_exit();
 }
 
@@ -127,7 +127,7 @@ exec (const char *cmd_line) {
 
 int
 wait (pid_t pid) {
-	
+	process_wait ();
 }
 
 bool
@@ -160,7 +160,10 @@ read (int fd, void *buffer, unsigned size) {
 
 int
 write (int fd, const void *buffer, unsigned size) {
-
+	if (fd == 1) {
+		putbuf (buffer, size);
+	}
+	return size;
 }
 
 void
