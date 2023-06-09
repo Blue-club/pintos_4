@@ -50,8 +50,11 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	char *token, *next_ptr;
+	token = strtok_r (file_name, " ", &next_ptr);
+
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (token, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
@@ -158,6 +161,41 @@ error:
 	thread_exit ();
 }
 
+/* argument parsing for project 2*/
+void
+argument_stack(char **argv, int argc, struct intr_frame *if_) {
+	/* argument stack downwards using rsp stack pointer */
+	for (int i = argc-1; i >= 0; i--) {
+		int N = strlen(argv[i]) + 1;
+		if_->rsp -= N;
+		memcpy(if_->rsp, argv[i], N);
+		argv[i] = (char *)if_->rsp;
+	}
+	
+	/* word-alignment*/
+	if (if_->rsp%8) {
+		int padding = if_->rsp%8;
+		if_->rsp -= padding;
+		memset(if_->rsp, 0, padding);
+	}
+
+	/* for null sentinel */
+	if_->rsp -= 8;
+	memset(if_->rsp, 0, sizeof(char **));
+
+	for (int i = argc-1; i >= 0; i--) {
+		if_->rsp -= 8;
+		memcpy(if_->rsp, &argv[i], sizeof(char **));
+	}
+
+	/* fake return address */
+	if_->rsp -= 8;
+	memset(if_->rsp, 0, sizeof(void *));
+
+	if_->R.rdi = argc;
+	if_->R.rsi = if_->rsp + 8;
+}
+
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
 int
@@ -178,7 +216,7 @@ process_exec (void *f_name) {
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
-
+	
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
@@ -204,6 +242,7 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	for (int i = 0; i < 200000000; i++);
 	return -1;
 }
 
@@ -329,6 +368,20 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	/* TODO: Your code goes here.
+	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	int argc = 0;
+	char *argv[64];
+	char *ret_ptr, *next_ptr;
+
+	ret_ptr = strtok_r(file_name, " ", &next_ptr);
+	while (ret_ptr) {
+		argv[argc++] = ret_ptr;
+		ret_ptr = strtok_r(NULL, " ", &next_ptr);
+	}
+
+	// printf("😀 file name: %s 😀\n", argv[0]);
+
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
@@ -336,9 +389,9 @@ load (const char *file_name, struct intr_frame *if_) {
 	process_activate (thread_current ());
 
 	/* Open executable file. */
-	file = filesys_open (file_name);
+	file = filesys_open (argv[0]);
 	if (file == NULL) {
-		printf ("load: %s: open failed\n", file_name);
+		printf ("load: %s: open failed\n", argv[0]);
 		goto done;
 	}
 
@@ -350,7 +403,7 @@ load (const char *file_name, struct intr_frame *if_) {
 			|| ehdr.e_version != 1
 			|| ehdr.e_phentsize != sizeof (struct Phdr)
 			|| ehdr.e_phnum > 1024) {
-		printf ("load: %s: error loading executable\n", file_name);
+		printf ("load: %s: error loading executable\n", argv[0]);
 		goto done;
 	}
 
@@ -414,8 +467,9 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	
+	argument_stack(argv, argc, if_);
+	// hex_dump(if_->rsp, if_->rsp, USER_STACK - if_->rsp, true);
 
 	success = true;
 
