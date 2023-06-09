@@ -46,47 +46,49 @@ syscall_handler (struct intr_frame *f) {
 
 	switch (syscall_number) {
 		case SYS_HALT:
-			halt();
+			halt ();
 			break;
 		case SYS_EXIT:
-			exit(f->R.rdi);
+			exit (f->R.rdi);
 			break;
 		case SYS_FORK:
-			fork(f->R.rdi);
+			fork (f->R.rdi);
 			break;
 		case SYS_EXEC:
-			exec(f->R.rdi);
+			exec (f->R.rdi);
 			break;
 		case SYS_WAIT:
-			wait(f->R.rdi);
+			f->R.rax = wait (f->R.rdi);
 			break;
 		case SYS_CREATE:
-			create(f->R.rdi, f->R.rsi);
+			create (f->R.rdi, f->R.rsi);
 			break;
 		case SYS_REMOVE:
-			remove(f->R.rdi);
+			remove (f->R.rdi);
 			break;	
 		case SYS_OPEN:
-			open(f->R.rdi);		
+			open (f->R.rdi);		
 			break;
 		case SYS_FILESIZE:
-			filesize(f->R.rdi);
+			filesize (f->R.rdi);
 			break;
 		case SYS_READ:
-			read(f->R.rdi, f->R.rsi, f->R.rdx);
+			read (f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_WRITE:
-			write(f->R.rdi, f->R.rsi, f->R.rdx);
+			f->R.rax = write (f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_SEEK:
-			seek(f->R.rdi, f->R.rsi);
+			seek (f->R.rdi, f->R.rsi);
 			break;	
 		case SYS_TELL:
-			tell(f->R.rdi);
+			tell (f->R.rdi);
 			break;
 		case SYS_CLOSE:
-			close(f->R.rdi);
+			close (f->R.rdi);
 			break;
+		default:
+			exit (-1);
 	}
 
 	// printf ("system call!\n");
@@ -98,7 +100,7 @@ check_address(void *addr) {
 	// TODO: If you encounter an invalid user pointer afterward, you must still be sure to release the lock or free the page of memory.
 	struct thread *t = thread_current();
 
-	if (is_kernel_vaddr(addr) || addr == NULL || pml4_get_page(t->pml4, addr) == NULL) {
+	if (is_kernel_vaddr (addr) || addr == NULL || pml4_get_page (t->pml4, addr) == NULL) {
 		exit(-1);
 	}
 }
@@ -112,12 +114,13 @@ void
 exit (int status) {
 	struct thread *t = thread_current();
 	printf("%s: exit(%d)\n", t->name, status);
+	t->exit_status = status;
 	thread_exit();
 }
 
 pid_t
 fork (const char *thread_name) {
-
+	
 }
 
 int

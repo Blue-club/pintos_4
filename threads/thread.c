@@ -322,8 +322,8 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->init_priority = new_priority;
-	refresh_priority();
-	test_max_priority();
+	refresh_priority ();
+	test_max_priority ();
 }
 
 /* Returns the current thread's priority. */
@@ -427,9 +427,12 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->wait_on_lock = NULL;
 	list_init (&t->donations);
 
+#ifdef USERPROG
 	/* Project 2. */
+	t->exit_status = 0;
 	t->parent = NULL;
 	list_init (&t->sibling_list);
+#endif
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

@@ -50,6 +50,7 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	/* Project 2. */
 	char *token, *next_ptr;
 	token = strtok_r (file_name, " ", &next_ptr);
 
@@ -163,12 +164,12 @@ error:
 
 /* argument parsing for project 2*/
 void
-argument_stack(char **argv, int argc, struct intr_frame *if_) {
+argument_stack (char **argv, int argc, struct intr_frame *if_) {
 	/* argument stack downwards using rsp stack pointer */
 	for (int i = argc-1; i >= 0; i--) {
-		int N = strlen(argv[i]) + 1;
+		int N = strlen (argv[i]) + 1;
 		if_->rsp -= N;
-		memcpy(if_->rsp, argv[i], N);
+		memcpy (if_->rsp, argv[i], N);
 		argv[i] = (char *)if_->rsp;
 	}
 	
@@ -176,21 +177,21 @@ argument_stack(char **argv, int argc, struct intr_frame *if_) {
 	if (if_->rsp%8) {
 		int padding = if_->rsp%8;
 		if_->rsp -= padding;
-		memset(if_->rsp, 0, padding);
+		memset (if_->rsp, 0, padding);
 	}
 
 	/* for null sentinel */
 	if_->rsp -= 8;
-	memset(if_->rsp, 0, sizeof(char **));
+	memset (if_->rsp, 0, sizeof(char **));
 
 	for (int i = argc-1; i >= 0; i--) {
 		if_->rsp -= 8;
-		memcpy(if_->rsp, &argv[i], sizeof(char **));
+		memcpy (if_->rsp, &argv[i], sizeof(char **));
 	}
 
 	/* fake return address */
 	if_->rsp -= 8;
-	memset(if_->rsp, 0, sizeof(void *));
+	memset (if_->rsp, 0, sizeof(void *));
 
 	if_->R.rdi = argc;
 	if_->R.rsi = if_->rsp + 8;
@@ -368,8 +369,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	/* Project 2. */
 	int argc = 0;
 	char *argv[64];
 	char *ret_ptr, *next_ptr;
@@ -379,8 +379,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		argv[argc++] = ret_ptr;
 		ret_ptr = strtok_r(NULL, " ", &next_ptr);
 	}
-
-	// printf("😀 file name: %s 😀\n", argv[0]);
+	/* Project 2. */
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
@@ -391,7 +390,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Open executable file. */
 	file = filesys_open (argv[0]);
 	if (file == NULL) {
-		printf ("load: %s: open failed\n", argv[0]);
+		printf ("load: %s: open failed\n", argv[0]); // file_name -> argv[0]
 		goto done;
 	}
 
@@ -466,11 +465,12 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
-
 	
-	argument_stack(argv, argc, if_);
-	// hex_dump(if_->rsp, if_->rsp, USER_STACK - if_->rsp, true);
-
+	/* Project 2. */
+	argument_stack (argv, argc, if_);
+	// hex_dump (if_->rsp, if_->rsp, USER_STACK - if_->rsp, true);
+	/* Project 2. */
+	
 	success = true;
 
 done:

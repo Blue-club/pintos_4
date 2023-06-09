@@ -107,6 +107,7 @@ struct thread {
 
 #ifdef USERPROG
 	/* Project 2. */
+	int exit_status;
 	struct thread *parent;
 	struct list sibling_list;
 	struct list_elem children_elem;
