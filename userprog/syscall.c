@@ -41,62 +41,56 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
-void
-syscall_handler (struct intr_frame *f) {
-	// TODO: Your implementation goes here.
-	check_address (f->rsp);
-	int syscall_number = f->R.rax;
-
-	switch (syscall_number) {
+void syscall_handler(struct intr_frame *f UNUSED)
+{
+	int syscall_n = f->R.rax; /* 시스템 콜 넘버 */
+	switch (syscall_n) {
 		case SYS_HALT:
-			halt ();
+			halt();
 			break;
 		case SYS_EXIT:
-			exit (f->R.rdi);
+			exit(f->R.rdi);
 			break;
 		case SYS_FORK:
-			fork (f->R.rdi);
+			f->R.rax = fork(f->R.rdi, f);
 			break;
 		case SYS_EXEC:
-			exec (f->R.rdi);
+			f->R.rax = exec(f->R.rdi);
 			break;
 		case SYS_WAIT:
-			f->R.rax = wait (f->R.rdi);
+			f->R.rax = wait(f->R.rdi);
 			break;
 		case SYS_CREATE:
-			create (f->R.rdi, f->R.rsi);
+			f->R.rax = create(f->R.rdi, f->R.rsi);
 			break;
 		case SYS_REMOVE:
-			remove (f->R.rdi);
-			break;	
+			f->R.rax = remove(f->R.rdi);
+			break;
 		case SYS_OPEN:
-			open (f->R.rdi);		
+			f->R.rax = open(f->R.rdi);
 			break;
 		case SYS_FILESIZE:
-			filesize (f->R.rdi);
+			f->R.rax = filesize(f->R.rdi);
 			break;
 		case SYS_READ:
-			read (f->R.rdi, f->R.rsi, f->R.rdx);
+			f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_WRITE:
-			f->R.rax = write (f->R.rdi, f->R.rsi, f->R.rdx);
+			f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_SEEK:
-			seek (f->R.rdi, f->R.rsi);
-			break;	
+			seek(f->R.rdi, f->R.rsi);
+			break;
 		case SYS_TELL:
-			tell (f->R.rdi);
+			f->R.rax = tell(f->R.rdi);
 			break;
 		case SYS_CLOSE:
-			close (f->R.rdi);
-			break;
-		default:
-			exit (-1);
+			close(f->R.rdi);
 	}
-
 	// printf ("system call!\n");
 	// thread_exit ();
 }
@@ -104,9 +98,7 @@ syscall_handler (struct intr_frame *f) {
 void
 check_address(void *addr) {
 	// TODO: If you encounter an invalid user pointer afterward, you must still be sure to release the lock or free the page of memory.
-	struct thread *t = thread_current ();
-
-	if (is_kernel_vaddr (addr) || addr == NULL || pml4_get_page (t->pml4, addr) == NULL) {
+	if (is_kernel_vaddr (addr) || addr == NULL || pml4_get_page(thread_current()->pml4, addr) == NULL) {
 		exit (-1);
 	}
 }
@@ -124,30 +116,25 @@ exit (int status) {
 	thread_exit ();
 }
 
-pid_t
-fork (const char *thread_name) {
-	struct thread *t = thread_current ();
-	return process_fork (thread_name, &t->tf);
+tid_t fork (char *thread_name, struct intr_frame *f) {
+	return process_fork (thread_name, f);
 }
 
 int
 exec (const char *cmd_line) {
 	check_address (cmd_line);
-	char *file_name = (char *)palloc_get_page (PAL_ASSERT);
+	char *file_name = (char *)palloc_get_page (PAL_ZERO);
 	if (file_name == NULL)
 		exit (-1);
-	
 	memcpy (file_name, cmd_line, strlen (cmd_line)+1);
-	// check_address (file_name);
-	int result = process_exec (file_name);
-	if (result == -1) {
+
+	if (process_exec (file_name) == -1) 
 		exit (-1);
-	}
 }
 
 int
 wait (pid_t pid) {
-	process_wait (pid);
+	return process_wait (pid);
 }
 
 bool
@@ -178,7 +165,7 @@ read (int fd, void *buffer, unsigned size) {
 
 }
 
-int
+/* int
 write (int fd, const void *buffer, unsigned size) {
 	printf("%p\n", buffer);
 	if (buffer == NULL)
@@ -187,6 +174,30 @@ write (int fd, const void *buffer, unsigned size) {
 		putbuf (buffer, size);
 	}
 	return size;
+}*/
+
+int
+write (int fd, const void *buffer, unsigned size) {	
+	// printf("%s\n", buffer);
+	check_address(buffer);
+	int bytes_write = 0;
+	if (fd == 1)
+	{
+		putbuf(buffer, size);
+		bytes_write = size;
+	}
+	else
+	{
+		if (fd < 2)
+			return -1;
+		struct file *file = process_get_file(fd);
+		if (file == NULL)
+			return -1;
+		lock_acquire(&filesys_lock);
+		bytes_write = file_write(file, buffer, size);
+		lock_release(&filesys_lock);
+	}
+	return bytes_write;
 }
 
 void
