@@ -7,7 +7,12 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+
+/* Project 2. */
+#include "userprog/process.h"
 #include "threads/palloc.h"
+#include "filesys/filesys.h"
+/* Project 2. */
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -108,20 +113,21 @@ check_address(void *addr) {
 
 void
 halt (void) {
-	power_off();
+	power_off ();
 }
 
 void
 exit (int status) {
-	struct thread *t = thread_current();
-	printf("%s: exit(%d)\n", t->name, status);
+	struct thread *t = thread_current ();
+	printf ("%s: exit(%d)\n", t->name, status);
 	t->exit_status = status;
-	thread_exit();
+	thread_exit ();
 }
 
 pid_t
 fork (const char *thread_name) {
-	
+	struct thread *t = thread_current ();
+	return process_fork (thread_name, &t->tf);
 }
 
 int
@@ -141,7 +147,7 @@ exec (const char *cmd_line) {
 
 int
 wait (pid_t pid) {
-	process_wait ();
+	process_wait (pid);
 }
 
 bool
@@ -174,6 +180,9 @@ read (int fd, void *buffer, unsigned size) {
 
 int
 write (int fd, const void *buffer, unsigned size) {
+	printf("%p\n", buffer);
+	if (buffer == NULL)
+		exit (-1);
 	if (fd == 1) {
 		putbuf (buffer, size);
 	}
