@@ -185,36 +185,42 @@ thread_print_stats (void) {
    Priority scheduling is the goal of Problem 1-3. */
 tid_t
 thread_create (const char *name, int priority,
-		thread_func *function, void *aux) {
+		thread_func *function, void *aux)
+// 인자: 실행할 함수의 이름, 기본 우선순위, 함수 이름, 보조 매개변수
+{
 	struct thread *t;
 	tid_t tid;
 
-	ASSERT (function != NULL);
+	ASSERT(function != NULL);
 
 	/* Allocate thread. */
-	t = palloc_get_page (PAL_ZERO);
+	t = palloc_get_page(PAL_ZERO); // 커널 공간을 위한 4KB의 싱글 페이지를 할당한다
 	if (t == NULL)
 		return TID_ERROR;
 
 	/* Initialize thread. */
-	init_thread (t, name, priority);
-	tid = t->tid = allocate_tid ();
+	init_thread(t, name, priority); // 위에서 할당한 4KB의 단일 공간에 스레드 구조체를 초기화한다. (스레드 구조체의 크기는 64바이트 또는 128바이트가 된다.)
+	tid = t->tid = allocate_tid();	// 스레드의 고유한 ID를 할당한다.
 
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
-	t->tf.rip = (uintptr_t) kernel_thread;
-	t->tf.R.rdi = (uint64_t) function;
-	t->tf.R.rsi = (uint64_t) aux;
+	t->tf.rip = (uintptr_t)kernel_thread;
+	t->tf.R.rdi = (uint64_t)function; // 실행하려는 함수의 주소
+	t->tf.R.rsi = (uint64_t)aux;
 	t->tf.ds = SEL_KDSEG;
 	t->tf.es = SEL_KDSEG;
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
-	/* Add to run queue. */
-	thread_unblock (t);
+	// 현재 스레드의 자식으로 추가
+	list_push_back(&thread_current()->child_list, &t->child_elem);
 
-	/* Project 1 */
+	t->fdt = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+	if (t->fdt == NULL)
+		return TID_ERROR;
+	/* Add to run queue. */
+	thread_unblock(t);
 	test_max_priority();
 
 	return tid;
@@ -322,8 +328,8 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->init_priority = new_priority;
-	refresh_priority();
-	test_max_priority();
+	refresh_priority ();
+	test_max_priority ();
 }
 
 /* Returns the current thread's priority. */
@@ -410,26 +416,29 @@ kernel_thread (thread_func *function, void *aux) {
 /* Does basic initialization of T as a blocked thread named
    NAME. */
 static void
-init_thread (struct thread *t, const char *name, int priority) {
-	ASSERT (t != NULL);
-	ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
-	ASSERT (name != NULL);
+init_thread (struct thread *t, const char *name, int priority)
+{
+	ASSERT(t != NULL);
+	ASSERT(PRI_MIN <= priority && priority <= PRI_MAX);
+	ASSERT(name != NULL);
 
-	memset (t, 0, sizeof *t);
+	memset(t, 0, sizeof *t);
 	t->status = THREAD_BLOCKED;
-	strlcpy (t->name, name, sizeof t->name);
-	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
+	strlcpy(t->name, name, sizeof t->name);
+	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 
-	/* Project 1. */
 	t->init_priority = priority;
 	t->wait_on_lock = NULL;
-	list_init (&t->donations);
+	list_init(&(t->donations));
 
-	/* Project 2. */
-	t->parent = NULL;
-	list_init (&t->sibling_list);
+	t->exit_status = 0;
+	t->next_fd = 2;
+	sema_init(&t->load_sema, 0);
+	sema_init(&t->exit_sema, 0);
+	sema_init(&t->wait_sema, 0);
+	list_init(&(t->child_list));
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
