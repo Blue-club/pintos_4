@@ -185,27 +185,25 @@ thread_print_stats (void) {
    Priority scheduling is the goal of Problem 1-3. */
 tid_t
 thread_create (const char *name, int priority,
-		thread_func *function, void *aux)
-// 인자: 실행할 함수의 이름, 기본 우선순위, 함수 이름, 보조 매개변수
-{
+		thread_func *function, void *aux) {
 	struct thread *t;
 	tid_t tid;
 
-	ASSERT(function != NULL);
+	ASSERT (function != NULL);
 
 	/* Allocate thread. */
-	t = palloc_get_page(PAL_ZERO); // 커널 공간을 위한 4KB의 싱글 페이지를 할당한다
+	t = palloc_get_page (PAL_ZERO); // 커널 공간을 위한 4KB의 싱글 페이지를 할당한다
 	if (t == NULL)
 		return TID_ERROR;
 
 	/* Initialize thread. */
-	init_thread(t, name, priority); // 위에서 할당한 4KB의 단일 공간에 스레드 구조체를 초기화한다. (스레드 구조체의 크기는 64바이트 또는 128바이트가 된다.)
-	tid = t->tid = allocate_tid();	// 스레드의 고유한 ID를 할당한다.
+	init_thread (t, name, priority);
+	tid = t->tid = allocate_tid ();
 
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
 	t->tf.rip = (uintptr_t)kernel_thread;
-	t->tf.R.rdi = (uint64_t)function; // 실행하려는 함수의 주소
+	t->tf.R.rdi = (uint64_t)function;
 	t->tf.R.rsi = (uint64_t)aux;
 	t->tf.ds = SEL_KDSEG;
 	t->tf.es = SEL_KDSEG;
@@ -213,15 +211,20 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
-	// 현재 스레드의 자식으로 추가
-	list_push_back(&thread_current()->child_list, &t->child_elem);
+	/* Project 1. */
+	list_push_back (&thread_current ()->child_list, &t->child_elem);
 
-	t->fdt = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+	/* Project 2. */
+	t->fdt = palloc_get_multiple (PAL_ZERO, FDT_PAGES);
 	if (t->fdt == NULL)
 		return TID_ERROR;
+	/* Project 2. */
+	
 	/* Add to run queue. */
-	thread_unblock(t);
-	test_max_priority();
+	thread_unblock (t);
+
+	/* Project 1. */
+	test_max_priority ();
 
 	return tid;
 }
@@ -256,6 +259,8 @@ thread_unblock (struct thread *t) {
 	ASSERT (t->status == THREAD_BLOCKED);
 	/* When the thread is unblocked, it is inserted to ready_list in the priority order. */
 	t->status = THREAD_READY;
+
+	/* Project 1. */
 	list_insert_ordered (&ready_list, &t->elem, cmp_priority, NULL);
 
 	intr_set_level (old_level);
@@ -416,29 +421,28 @@ kernel_thread (thread_func *function, void *aux) {
 /* Does basic initialization of T as a blocked thread named
    NAME. */
 static void
-init_thread (struct thread *t, const char *name, int priority)
-{
-	ASSERT(t != NULL);
-	ASSERT(PRI_MIN <= priority && priority <= PRI_MAX);
-	ASSERT(name != NULL);
+init_thread (struct thread *t, const char *name, int priority) {
+	ASSERT (t != NULL);
+	ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
+	ASSERT (name != NULL);
 
-	memset(t, 0, sizeof *t);
+	memset (t, 0, sizeof *t);
 	t->status = THREAD_BLOCKED;
-	strlcpy(t->name, name, sizeof t->name);
-	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
+	strlcpy (t->name, name, sizeof t->name);
+	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 
 	t->init_priority = priority;
 	t->wait_on_lock = NULL;
-	list_init(&(t->donations));
+	list_init (&t->donations);
 
 	t->exit_status = 0;
 	t->next_fd = 2;
-	sema_init(&t->load_sema, 0);
-	sema_init(&t->exit_sema, 0);
-	sema_init(&t->wait_sema, 0);
-	list_init(&(t->child_list));
+	sema_init (&t->load_sema, 0);
+	sema_init (&t->exit_sema, 0);
+	sema_init (&t->wait_sema, 0);
+	list_init (&t->child_list);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -570,14 +574,14 @@ do_schedule(int status) {
 
 static void
 schedule (void) {
-	struct thread *curr = running_thread (); // 현재 돌고 있는 스레드를 curr 에 넣어줌
-	struct thread *next = next_thread_to_run ();// 다음에 실행시킬 스레드를 가져옴
+	struct thread *curr = running_thread ();
+	struct thread *next = next_thread_to_run ();
 
 	ASSERT (intr_get_level () == INTR_OFF);
-	ASSERT (curr->status != THREAD_RUNNING);// 앞에서 스레드 블록으로 변경해줬으니 알람 안울린다
+	ASSERT (curr->status != THREAD_RUNNING);
 	ASSERT (is_thread (next));
 	/* Mark us as running. */
-	next->status = THREAD_RUNNING; //다음에 돌릴 스레드를 러닝으로 변경
+	next->status = THREAD_RUNNING;
 
 	/* Start new time slice. */
 	thread_ticks = 0;
@@ -619,72 +623,79 @@ allocate_tid (void) {
 	return tid;
 }
 
-/* alarm clock 추가 */
+/* Project 1. */
 void
-thread_sleep(int64_t ticks) {
+thread_sleep (int64_t ticks) {
   enum intr_level old_level;
   old_level = intr_disable ();
-  struct thread *curr = thread_current();
-  if(curr != idle_thread) { 
+  struct thread *curr = thread_current ();
+  if (curr != idle_thread) { 
 	curr->wakeup_tick = ticks; 
 	curr->status = THREAD_BLOCKED;
 	
-	list_insert_ordered(&sleep_list, &curr->elem, cmp_priority, NULL);
-	save_min_tick();
+	list_insert_ordered (&sleep_list, &curr->elem, cmp_priority, NULL);
+	save_min_tick ();
 	schedule ();
   }
   intr_set_level (old_level);
 }
 
 void
-wakeup(int64_t mtick) {
+wakeup (int64_t mtick) {
 	if (list_empty(&sleep_list)) {
 		return;
 	}
 	
 	enum intr_level old_level = intr_disable ();
-	struct list_elem * curr_elem = list_front(&sleep_list);
+	struct list_elem * curr_elem = list_front (&sleep_list);
 	struct thread * curr_thread;
+
 	while (true) {
 		curr_thread = list_entry (curr_elem, struct thread, elem);
 		ASSERT(curr_thread->status == THREAD_BLOCKED);
 
 		if (curr_thread->wakeup_tick <= mtick) {
 			curr_thread->wakeup_tick = NULL;
-			curr_elem = list_remove(&curr_thread->elem);
-			thread_unblock(curr_thread);
-		}else{
-			curr_elem = list_next(curr_elem);
+			curr_elem = list_remove (&curr_thread->elem);
+			thread_unblock (curr_thread);
+		} else {
+			curr_elem = list_next (curr_elem);
 		}
-		if (curr_elem == list_end(&sleep_list))
+
+		if (curr_elem == list_end (&sleep_list))
 			break;
 	}
 
-	save_min_tick();
+	save_min_tick ();
 	intr_set_level (old_level);
 }
 
 void
-save_min_tick() {
-	if (list_empty(&sleep_list)) {
+save_min_tick () {
+	if (list_empty (&sleep_list)) {
 		next_tick_to_awake = INT64_MAX;
 		return;
 	}
-	struct list_elem * curr_elem = list_front(&sleep_list);
+
+	struct list_elem * curr_elem = list_front (&sleep_list);
 	struct thread * curr_thread;
+
 	while (true) {
 		curr_thread = list_entry (curr_elem, struct thread, elem);
-		ASSERT(curr_thread->status == THREAD_BLOCKED);
+		ASSERT (curr_thread->status == THREAD_BLOCKED);
+
 		if (curr_thread->wakeup_tick < next_tick_to_awake)
 			next_tick_to_awake = curr_thread->wakeup_tick;
-		if (curr_elem == list_back(&sleep_list))
+
+		if (curr_elem == list_back (&sleep_list))
 			break;
-		curr_elem = list_next(curr_elem);
+		
+		curr_elem = list_next (curr_elem);
 	}
 }
 
 int64_t
-return_min_tick() {
+return_min_tick () {
 	return next_tick_to_awake;
 }
 
@@ -699,9 +710,9 @@ cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux) {
 	Yield the CPU if the newly arriving thread has higher priority*/
 void
 test_max_priority (void) {
-	if (list_empty(&ready_list))
+	if (list_empty (&ready_list))
 		return;
-	if (!intr_context() && cmp_priority(list_front(&ready_list), &thread_current()->elem, NULL)) {
-		thread_yield();
+	if (!intr_context () && cmp_priority (list_front (&ready_list), &thread_current ()->elem, NULL)) {
+		thread_yield ();
 	}
 }

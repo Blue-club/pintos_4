@@ -119,11 +119,12 @@ struct thread {
 	struct file **fdt;
 	int next_fd;
 	
-	struct semaphore load_sema; // 현재 스레드가 load되는 동안 부모가 기다리게 하기 위한 semaphore
+	struct semaphore load_sema;
 	struct semaphore exit_sema;
 	struct semaphore wait_sema;
 
-	struct file *running; // 현재 실행중인 파일
+	struct file *running;
+	/* Project 2. */
 
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -149,8 +150,8 @@ void thread_start (void);
 void thread_tick (void);
 void thread_print_stats (void);
 
-typedef void thread_func (void *aux);
-tid_t thread_create (const char *name, int priority, thread_func *, void *);
+typedef void thread_func (void *);
+tid_t thread_create (const char *, int, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
@@ -162,6 +163,16 @@ const char *thread_name (void);
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
 
+
+void do_iret (struct intr_frame *);
+
+/* Project 1. */
+void thread_sleep (int64_t);
+void wakeup (int64_t);
+int64_t return_min_tick ();
+bool cmp_priority (const struct list_elem *, const struct list_elem *, void *);
+void test_max_priority (void);
+
 int thread_get_priority (void);
 void thread_set_priority (int);
 
@@ -169,13 +180,6 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-
-void do_iret (struct intr_frame *);
-
-void thread_sleep(int64_t); /* alarm clock 추가 */
-void wakeup(int64_t);
-int64_t return_min_tick();
-bool cmp_priority (const struct list_elem *, const struct list_elem *, void *);
-void test_max_priority (void);
+/* Project 1. */
 
 #endif /* threads/thread.h */
