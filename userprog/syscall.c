@@ -44,9 +44,12 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr (MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	
+	/* Project 2. */
 	lock_init (&filesys_lock);
 }
 
+/* Project 2. */
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f) {
@@ -117,7 +120,8 @@ exit (int status) {
 	thread_exit ();
 }
 
-tid_t fork (char *thread_name, struct intr_frame *f) {
+pid_t
+fork (char *thread_name, struct intr_frame *f) {
 	return process_fork (thread_name, f);
 }
 
@@ -187,16 +191,16 @@ read (int fd, void *buffer, unsigned size) {
 	}
 	else {
 		if (fd < 2) {
-
 			lock_release (&filesys_lock);
 			return -1;
 		}
+
 		struct file *file = process_get_file (fd);
 		if (file == NULL) {
-
 			lock_release (&filesys_lock);
 			return -1;
 		}
+
 		bytes_read = file_read (file, buffer, size);
 		lock_release (&filesys_lock);
 	}
@@ -215,9 +219,11 @@ write (int fd, const void *buffer, unsigned size) {
 	else {
 		if (fd < 2)
 			return -1;
+		
 		struct file *file = process_get_file (fd);
 		if (file == NULL)
 			return -1;
+		
 		lock_acquire (&filesys_lock);
 		bytes_write = file_write (file, buffer, size);
 		lock_release (&filesys_lock);

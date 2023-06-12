@@ -4,7 +4,11 @@
 #include <stdbool.h>
 #include <debug.h>
 #include <stddef.h>
+
+/* Project 2. */
 #include <threads/thread.h>
+#include <userprog/process.h>
+/* Project 2. */
 
 void syscall_init (void);
 
@@ -12,7 +16,7 @@ void syscall_init (void);
 void check_address (void *);
 void halt (void);
 void exit (int);
-tid_t fork (char *, struct intr_frame *);
+pid_t fork (char *, struct intr_frame *);
 int exec (const char *);
 int wait (pid_t);
 bool create (const char *, unsigned);

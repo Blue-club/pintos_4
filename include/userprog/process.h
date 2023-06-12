@@ -21,13 +21,16 @@ typedef int off_t;
 tid_t process_create_initd (const char *);
 tid_t process_fork (const char *, struct intr_frame *);
 int process_exec (void *);
-int process_wait (tid_t);
+int process_wait (pid_t);
 void process_exit (void);
 void process_activate (struct thread *);
+
+/* Project 2. */
 void argument_stack (char **, int, struct intr_frame *);
 int process_add_file (struct file *);
 struct file *process_get_file (int);
 void process_close_file (int);
 struct thread *get_child_process (pid_t);
+/* Project 2. */
 
 #endif /* userprog/process.h */

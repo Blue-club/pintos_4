@@ -150,10 +150,9 @@ __do_fork (void *aux) {
 	struct intr_frame if_;
 	struct thread *parent = (struct thread *)aux;
 	struct thread *current = thread_current ();
-	bool succ = true;
-
 	/* Project 2. */
 	struct intr_frame *parent_if = &parent->parent_if;
+	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
@@ -277,7 +276,7 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid) {
+process_wait (pid_t child_tid) {
 	struct thread *child = get_child_process (child_tid);
 	if (child == NULL)
 		return -1;
@@ -423,12 +422,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	char *argv[64];
 	char *ret_ptr, *next_ptr;
 
-	// printf("😀 %s\n", file_name);
-	ret_ptr = strtok_r(file_name, " ", &next_ptr);
+	ret_ptr = strtok_r (file_name, " ", &next_ptr);
 	while (ret_ptr) {
 		argv[argc++] = ret_ptr;
-		ret_ptr = strtok_r(NULL, " ", &next_ptr);
+		ret_ptr = strtok_r (NULL, " ", &next_ptr);
 	}
+	/* Project 2. */
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
@@ -511,6 +510,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Project 2. */
 	t->running = file;
 	file_deny_write (file);
+	/* Project 2. */
 
 	/* Set up stack. */
 	if (!setup_stack (if_))
@@ -522,11 +522,13 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Project 2. */
 	argument_stack (argv, argc, if_);
 	// hex_dump (if_->rsp, if_->rsp, USER_STACK - if_->rsp, true);
+	/* Project 2. */
 	
 	success = true;
 
 done:
 	/* We arrive here whether the load is successful or not. */
+	/* Project 2. */
 	// file_close (file);
 	return success;
 }
