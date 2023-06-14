@@ -93,6 +93,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 	sema_down (&child->load_sema);
 
 	if (child->exit_status == TID_ERROR) {
+		sema_up(&child->exit_sema);
 		return TID_ERROR;
 	}
 	return tid;
